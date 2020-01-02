@@ -1,6 +1,7 @@
 import pandas as pd
 import redis
-
+# host = "39.98.180.205"
+# pool = redis.ConnectionPool(host=host, port=6379, db=1, decode_responses=True)
 pool = redis.ConnectionPool(host='localhost', port=6379, db=1, decode_responses=True)
 red = redis.Redis(connection_pool=pool)
 
@@ -353,7 +354,7 @@ def send_test_again(receive_json):
             new_json = xyz_test(x_false_knowledge_ids_list, y_true_knowledge_ids_list, z_true_knowledge_ids_list, knowledge_ids, df_0, df_90,df_recall_group, location_ids_num, n=1)
             new_json.index += (location_ids_num + 1)  # 重置索引位置
             next_json = new_json.to_json(orient='index', force_ascii=False)
-            json = {"status": 0, "message": "success","result": {"user_id": user_id, "practice_id": practice_id, "data": eval(next_json)}}
+            json = {"status": 0, "message": "success", "result": {"user_id": user_id, "practice_id": practice_id, "data": eval(next_json)}}
 
             return json
 
