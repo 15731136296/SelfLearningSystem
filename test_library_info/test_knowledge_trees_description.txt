@@ -1,0 +1,11 @@
+序列号	字段名	字段描述	数据类型	数据样例	说明
+1	id           	知识树id	string	 	其实就是知识点的id
+2	name         	知识树名称	string	
+3	alias_name	知识树别名	string	  
+4	description  	知识树描述	string	 	 
+5	department   	归属学部	string	 	1 小学 2初中 3高中
+6	subject_id   	归属学科id	string	 	 
+7	subject_name 	归属学科名称	string	 	 
+8	parent_id    	父级id	string	 	顶级分类无父级id
+9	rank         	知识树等级	string	 	知识树共1-10个级别
+10	rank_string  	知识树等级串	string	 	开头、结尾处用连接点. 
