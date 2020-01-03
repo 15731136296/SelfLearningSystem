@@ -14,6 +14,8 @@ app = Flask(__name__)
 # route()方法用于设定路由；类似spring路由配置
 @app.route('/test',methods = ['POST'])
 def init_test():
+
+    # try:
     get_Data = request.get_data()  # 获取传入的参数
     receive_json = json.loads(get_Data, encoding='utf-8')  # 传入的参数为bytes类型，需要转化成json
     knowledge_ids = receive_json.get("knowledge_ids")
@@ -27,12 +29,14 @@ def init_test():
         # "策略二"
         init_json = practice.strategy_two.process_initialization(receive_json)
         return init_json
-
+    # except Exception as e:
+    #     return {"status": 1, "message": "failure"}
 
 
 
 @app.route('/practice',methods = ['POST'])
 def prepare_practice():
+    # try:
 
     get_Data = request.get_data()  # 获取传入的参数
     receive_json = json.loads(get_Data, encoding='utf-8')  # 传入的参数为bytes类型，需要转化成json
@@ -51,6 +55,8 @@ def prepare_practice():
         send_json = send_test_again(receive_json)
         return send_json
 
+    # except Exception as e:
+    #     return {"status": 1, "message": "failure"}
 
 if __name__ == '__main__':
 

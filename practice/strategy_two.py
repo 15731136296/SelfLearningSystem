@@ -84,42 +84,47 @@ def init_test_set(test_df, knowledge_ids):
         df_90.append(df_recall_90)
 
         # 组合题
-    df_recall_group_0 = test_df[
-        (test_df["knowledge_ids"].str.contains("13811|138112|138113")) & (test_df["knowledge_num"] > 1) & (
+    content = "|".join(knowledge_ids)
+    df_group_0 = test_df[
+        (test_df["knowledge_ids"].str.contains(content)) & (test_df["knowledge_num"] > 1) & (
                 test_df["difficulty"] == 0)]
-    df_recall_group_90 = test_df[
-        (test_df["knowledge_ids"].str.contains("13811|138112|138113")) & (test_df["knowledge_num"] > 1) & (
+    df_group_90 = test_df[
+        (test_df["knowledge_ids"].str.contains(content)) & (test_df["knowledge_num"] > 1) & (
                 test_df["difficulty"] == 90)]
 
-    return df_0, df_90, df_recall_group_0, df_recall_group_90
+    return df_0, df_90, df_group_0, df_group_90
 
 
-def init_test(df_0, df_90, knowledge_ids_num):
+def init_test(df_0, df_90, df_recall_group, knowledge_ids_num):
     # 备选集 初始化题目
     init_df = pd.DataFrame()
     for i in range(knowledge_ids_num):
         df_recall_0 = df_0[i]
         df_recall_90 = df_90[i]
-        if df_recall_0.empty and df_recall_90.shape[0] > 1:
-            init_test = df_recall_90.sample(2, replace=False)  # 要是没有的话，重复出题。
-        elif df_recall_0.shape[0] > 1:
-            init_test = df_recall_0.sample(2, replace=False)  # 要是没有的话，重复出题。
+
+        if df_recall_0.shape[0] > 1:
+            init_test = df_recall_0.sample(2)  # 要是没有的话，重复出题。
+
+        elif df_recall_0.empty and df_recall_90.shape[0] > 1:
+            init_test = df_recall_90.sample(2)  # 要是没有的话，重复出题。
+
+        elif df_recall_0.empty and df_recall_90.empty:
+            init_test = df_recall_group.sample(2, replace=False)  # 要是没有的话，重复出题。 #没有单知识点的题目,暂时设为空,选择组合题？
+
+        else:
+            init_test = pd.DataFrame()
 
         init_df = init_df.append(init_test)
+
     init_df = init_df.reset_index(drop=True)  # 重置索引
-    # 修改列名
-    # init_df =init_df.rename({"ids_split": "knowledge_ids"})
-    # 暂定数据格式
-    init_df.index += 1  #索引从1开始
+    init_df.index += 1  # 索引从1开始
+    df = init_df[["test_id", "test_type", "ids_split"]]
+    df = df.rename(columns={"test_id": "test_id", "test_type": "test_type", "ids_split": "knowledge_ids"})
+    init_json = df.to_json(orient='index', force_ascii=False)
 
-    # df = init_df[["test_id", "ids_split"]]
-    # df.rename(columns={"ids_split": "knowledge_ids"})
+    test_id_list = df["test_id"].to_list()
 
-    init_json = init_df[["test_id", "ids_split"]].to_json(orient='index', force_ascii=False)
-    location_ids_num = init_df.shape[0]
-    print(init_json, location_ids_num)
-    return init_json, location_ids_num
-
+    return init_json, test_id_list
 
 def process_initialization(init_json):
 
@@ -146,14 +151,14 @@ def process_initialization(init_json):
     knowledge_ids = [str(i) for i in knowledge_ids]
     knowledge_ids_num = len(knowledge_ids)
     # 初始化练习题的数据范围
-    df_0, df_90, df_recall_group_0, df_recall_group_90 = init_test_set(test_df, knowledge_ids)
-    df_recall_group = df_recall_group_0.append(df_recall_group_90)
+    df_0, df_90, df_group_0, df_group_90 = init_test_set(test_df, knowledge_ids)
+    df_recall_group = df_group_0.append(df_group_90)
 
     # 第一层
     # 题量: 25
     # n道只含一个知识点的题目
-    init_json, location_ids_num = init_test(df_0, df_90, knowledge_ids_num)
-    # location_ids_num 为实际发送题目解析返回数据
+    init_json, test_id_list = init_test(df_0, df_90, df_recall_group, knowledge_ids_num)
+    location_ids_num = len(test_id_list)# location_ids_num 为实际发送题目解析返回数据
 
     df_0_dict = {}
     for i, j in enumerate(df_0):
@@ -163,9 +168,9 @@ def process_initialization(init_json):
         df_90_dict[str(i)] = j.to_dict()
     knowledge_ids_num = len(knowledge_ids)
 
-    dict_test = {"practice_id": practice_id, "knowledge_ids_num": knowledge_ids_num,
-                 "location_ids_num":location_ids_num, "time_threshold": time_threshold,
-                 "df_0": df_0_dict,"df_90": df_90_dict, "df_recall_group": df_recall_group.to_dict()}
+    dict_test = {"practice_id": practice_id, "knowledge_ids_num": knowledge_ids_num, "test_id_list": test_id_list,
+                 "location_ids_num": location_ids_num, "time_threshold": time_threshold,
+                 "df_0": df_0_dict, "df_90": df_90_dict, "df_recall_group": df_recall_group.to_dict()}
     # dict_test["knowledge_ids"] = ",".join([str(i) for i in init_json["knowledge_ids"]])#降低redis版本后可以存列表的数据了
     red.hmset(str(practice_id), dict_test)#保存到redis
     #返回数据
@@ -200,38 +205,66 @@ def sorting_result(df_receive_results, time_threshold):
 
 
 
-def xyz_test(x_false_knowledge_ids_list,y_true_knowledge_ids_list,z_true_knowledge_ids_list, knowledge_ids,df_0,df_90,df_recall_group,location_ids_num,n=None, m=1, k=1):
+def xyz_test(x_false_knowledge_ids_list,y_true_knowledge_ids_list,z_true_knowledge_ids_list, knowledge_ids,df_0,df_90,df_recall_group, test_id_list,n=None, m=1, k=1):
+
+    location_ids_num = len(test_id_list)
+
     if x_false_knowledge_ids_list:
         for i in x_false_knowledge_ids_list:
 
             index = knowledge_ids.index(i)
 
-            if df_0[index].shape[0] > 1:
-                df_recall_x = df_0[index].sample(n)
+            df_0_filter = df_0[index][- df_0[index]["test_id"].isin(test_id_list)]
+
+            if df_0_filter.shape[0] > 1:
+                df_recall_x = df_0_filter.sample(n)
+            else:
+                if df_0[index].shape[0] > 1:
+                    df_recall_x = df_0[index].sample(n)
+                else:
+                    df_recall_x = pd.DataFrame()
+
     else:
         df_recall_x = pd.DataFrame()
+
+
 
     if y_true_knowledge_ids_list:
         for i in y_true_knowledge_ids_list:
 
             index = knowledge_ids.index(i)
-            if df_0[index].shape[0] > 0:
-                df_recall_y = df_0[index].sample(m)
+
+            df_0_filter = df_0[index][- df_0[index]["test_id"].isin(test_id_list)]
+
+            if df_0_filter.shape[0] > 0:
+                df_recall_y = df_0_filter.sample(m)
+
+            else:
+                if df_0[index].shape[0] > 0:
+                    df_recall_y = df_0[index].sample(m)
+                else:
+                    df_recall_y = pd.DataFrame()
     else:
         df_recall_y = pd.DataFrame()
 
     if z_true_knowledge_ids_list:
         for i in z_true_knowledge_ids_list:
             index = knowledge_ids.index(i)
-            if df_90[index].shape[0] > 0:
-                df_recall_z = df_90[index].sample(k)
+
+            df_90_filter = df_90[index][- df_90[index]["test_id"].isin(test_id_list)]
+
+            if df_90_filter.shape[0] > 0:
+                df_recall_z = df_90_filter.sample(k)
+            else:
+                if df_90[index].shape[0] > 0:
+                    df_recall_z = df_90[index].sample(m)
+                else:
+                    df_recall_z = pd.DataFrame()
     else:
         df_recall_z = pd.DataFrame()
 
     new_test_df = pd.concat([df_recall_x, df_recall_y, df_recall_z], axis=0, ignore_index=True)
-
     group_num = 25 - location_ids_num - new_test_df.shape[0]
-
 
     # 修改判断个数
 
@@ -240,71 +273,15 @@ def xyz_test(x_false_knowledge_ids_list,y_true_knowledge_ids_list,z_true_knowled
 
 
     new_test_df = new_test_df.reset_index(drop=True)
-    new_json = new_test_df[["test_id", "ids_split"]]
+    new_json = new_test_df[["test_id", "test_type", "ids_split"]]
+    new_json = new_json.rename(columns={"test_id": "test_id", "test_type": "test_type", "ids_split": "knowledge_ids"})
+
 
     return new_json
 
 
-def init(init_json):
-
-    user_id = init_json.get("user_id")
-    practice_id = init_json.get("practice_id")
-    subject_id = init_json.get("subject_id")  # 学科-数学
-    department_id = init_json.get("department_id")  # 小学
-    grade_ids = init_json.get("grade_ids")  # 年级
-    textbook = init_json.get("textbook")  # 教材
-    chapter = init_json.get("chapter")  #章
-    knowledge_ids = init_json.get("knowledge_ids")# 章节\章节——叶子知识点
-
-    # 自己加载,根据用户id获取
-    time_threshold = 15  # 初始化准备,加载学生信息。没有的话,设定一个值time_threshold = 60
-    init = [user_id, practice_id, subject_id, department_id, grade_ids, textbook, chapter]
-    return init, knowledge_ids, time_threshold
-
-
 
 def send_test_again(receive_json):
-
-# # 一、保存的数据
-#     init_json = {"user_id": 1, "practice_id": 1, "subject_id": 2,
-#                  "department_id": 1, "grade_ids": 4, "textbook": 13796,
-#                  "chapter": 13803, "knowledge_ids": [13811, 13812, 13813, 13814]}
-#
-#
-#     init_data, knowledge_ids, time_threshold = init(init_json)
-#
-#     test_df = get_test_df()
-#     knowledge_ids = [str(i) for i in knowledge_ids]
-#     # # 初始化练习题的数据范围
-#     df_0, df_90, df_recall_group_0, df_recall_group_90 = init_test_set(test_df, knowledge_ids)
-#     df_recall_group = df_recall_group_0.append(df_recall_group_90)
-#
-#     df_0_dict = {}
-#     for i, j in enumerate(df_0):
-#         df_0_dict[str(i)] = j.to_dict()
-#     df_90_dict = {}
-#     for i, j in enumerate(df_90):
-#         df_90_dict[str(i)] = j.to_dict()
-#
-#     practice_id = init_json["practice_id"]
-#     knowledge_ids = init_json["knowledge_ids"]
-#     knowledge_ids_num = len(knowledge_ids)
-#     time_threshold = 30
-#     location_ids = [0, 1, 2, 3, 4, 5, 6, 7]
-#     location_ids_num = len(location_ids)# 实际发送题目解析返回数据
-#
-#     dict_test = {"practice_id": practice_id, "knowledge_ids_num": knowledge_ids_num,
-#                  "location_ids_num":location_ids_num, "time_threshold": time_threshold,
-#                  "df_0": df_0_dict,"df_90": df_90_dict, "df_recall_group": df_recall_group.to_dict()}
-#
-#
-#     dict_test["knowledge_ids"] = ",".join([str(i) for i in init_json["knowledge_ids"]])
-#     red.hmset(str(practice_id), dict_test)
-
-
-
-
-# 一、保存的数据
 
 
     #获得用户的练习id
@@ -327,9 +304,7 @@ def send_test_again(receive_json):
     time_threshold = eval(red_dict["time_threshold"])
     knowledge_ids_num = eval(red_dict["knowledge_ids_num"])
     location_ids_num = eval(red_dict["location_ids_num"])
-
-
-
+    test_id_list = eval(red_dict["test_id_list"])
 
 
     df_receive_results = pd.DataFrame(receive_json.get("result"))
@@ -356,7 +331,8 @@ def send_test_again(receive_json):
             # print(x, y, z)
             # print("出题策略为 1x_1y_1z_组合")
 
-            new_json = xyz_test(x_false_knowledge_ids_list, y_true_knowledge_ids_list, z_true_knowledge_ids_list, knowledge_ids, df_0, df_90,df_recall_group, location_ids_num, n=1)
+            new_json = xyz_test(x_false_knowledge_ids_list, y_true_knowledge_ids_list, z_true_knowledge_ids_list, knowledge_ids, df_0, df_90, df_recall_group, test_id_list, n=1)
+            location_ids_num = len(test_id_list)
             new_json.index += (location_ids_num + 1)  # 重置索引位置
             next_json = new_json.to_json(orient='index', force_ascii=False)
             json = {"status": 0, "message": "success", "result": {"user_id": user_id, "practice_id": practice_id, "data": eval(next_json)}}
@@ -366,7 +342,8 @@ def send_test_again(receive_json):
         elif (25 - 2 * knowledge_ids_num) / x > 2:
             # print(x, y, z)
             # print("出题策略为 2x_1y_1z_组合")
-            new_json = xyz_test(x_false_knowledge_ids_list, y_true_knowledge_ids_list, z_true_knowledge_ids_list, knowledge_ids, df_0, df_90, df_recall_group, location_ids_num, n=2)
+            new_json = xyz_test(x_false_knowledge_ids_list, y_true_knowledge_ids_list, z_true_knowledge_ids_list, knowledge_ids, df_0, df_90, df_recall_group, test_id_list, n=2)
+            location_ids_num = len(test_id_list)
             new_json.index += (location_ids_num+1) #重置索引位置
             next_json = new_json.to_json(orient='index', force_ascii=False)
             json = {"status": 0, "message": "success",
@@ -376,7 +353,8 @@ def send_test_again(receive_json):
     else:
         # print(x, y, z)
         # print("出题策略为 1y_1z_组合")
-        new_json = xyz_test(x_false_knowledge_ids_list, y_true_knowledge_ids_list, z_true_knowledge_ids_list, knowledge_ids, df_0, df_90,df_recall_group, location_ids_num)
+        new_json = xyz_test(x_false_knowledge_ids_list, y_true_knowledge_ids_list, z_true_knowledge_ids_list, knowledge_ids, df_0, df_90, df_recall_group, test_id_list)
+        location_ids_num = len(test_id_list)
         new_json.index += (location_ids_num + 1)  # 重置索引位置
         next_json = new_json.to_json(orient='index', force_ascii=False)
         json = {"status": 0, "message": "success",
@@ -401,30 +379,34 @@ def send_test_again(receive_json):
 """
 
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
 
 
-    init_json = {"user_id": 1, "practice_id": 1, "subject_id": 2,
-                 "department_id": 1, "grade_ids": 2, "textbook": 13796,
-                 "chapter": 13803, "knowledge_ids": [13811, 13812, 13813, 13814]}
+    # [13916, 13917, 13918, 13919]
 
-    process_initialization(init_json)
-#     receive_json = {"user_id": 1000001, "practice_id": 1, "result":
-#         [{"location": 1, "test_id": 2057204, "is_true": 0, "difficulty": 0, "time_consuming": 40,
-#           "knowledge_ids": [13811]},
-#          {"location": 2, "test_id": 2057202, "is_true": 0, "difficulty": 0, "time_consuming": 2,
-#           "knowledge_ids": [13811]},
-#          {"location": 3, "test_id": 2057214, "is_true": 1, "difficulty": 0, "time_consuming": 3,
-#           "knowledge_ids": [13812]},
-#          {"location": 4, "test_id": 2057213, "is_true": 1, "difficulty": 0, "time_consuming": 9,
-#           "knowledge_ids": [13812]},
-#          {"location": 5, "test_id": 2057225, "is_true": 1, "difficulty": 0, "time_consuming": 4,
-#           "knowledge_ids": [13813]},
-#          {"location": 6, "test_id": 2057222, "is_true": 0, "difficulty": 0, "time_consuming": 2,
-#           "knowledge_ids": [13813]},
-#          {"location": 7, "test_id": 2057234, "is_true": 1, "difficulty": 0, "time_consuming": 3,
-#           "knowledge_ids": [13814]},
-#          {"location": 8, "test_id": 2057236, "is_true": 0, "difficulty": 0, "time_consuming": 19,
-#           "knowledge_ids": [13814]}]}
-#     send_test_again(receive_json)
+    # init_json = {"user_id": 100, "practice_id": 100, "subject_id": 2,
+    #                  "department_id": 1, "grade_ids": 4, "textbook": 13796,
+    #                  "chapter": 13910, "knowledge_ids": [13916, 13917, 13918, 13919]}
+    #
+    # s = process_initialization(init_json)
+    # print(s)
+    # receive_json = {"user_id": 100, "practice_id": 100, "result":
+    #     [{"location": 1, "test_id": 2253021, "is_true": 1, "difficulty": 0, "time_consuming": 40,
+    #       "knowledge_ids": [13916]},
+    #      {"location": 2, "test_id": 2242066, "is_true": 0, "difficulty": 0, "time_consuming": 2,
+    #       "knowledge_ids": [13916]},
+    #      {"location": 3, "test_id": 2157981, "is_true": 0, "difficulty": 0, "time_consuming": 3,
+    #       "knowledge_ids": [13917]},
+    #      {"location": 4, "test_id": 2489086, "is_true": 1, "difficulty": 0, "time_consuming": 9,
+    #       "knowledge_ids": [13917]},
+    #      {"location": 5, "test_id": 2255301, "is_true": 0, "difficulty": 0, "time_consuming": 4,
+    #       "knowledge_ids": [13918]},
+    #      {"location": 6, "test_id": 2226515, "is_true": 0, "difficulty": 0, "time_consuming": 2,
+    #       "knowledge_ids": [13918]},
+    #      {"location": 7, "test_id": 2066801, "is_true": 1, "difficulty": 0, "time_consuming": 3,
+    #       "knowledge_ids": [13918, 33816, 34007, 34013]},
+    #      {"location": 8, "test_id": 2242024, "is_true": 0, "difficulty": 0, "time_consuming": 19,
+    #       "knowledge_ids":[13917, 33726, 34002]}]}
+    # s = send_test_again(receive_json)
+    # print(s)
 
