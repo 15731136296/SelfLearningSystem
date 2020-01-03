@@ -111,13 +111,8 @@ def init_test(df_0, df_90, knowledge_ids_num):
     # init_df =init_df.rename({"ids_split": "knowledge_ids"})
     # 暂定数据格式
     init_df.index += 1  #索引从1开始
-
-    # df = init_df[["test_id", "ids_split"]]
-    # df.rename(columns={"ids_split": "knowledge_ids"})
-
     init_json = init_df[["test_id", "ids_split"]].to_json(orient='index', force_ascii=False)
     location_ids_num = init_df.shape[0]
-    print(init_json, location_ids_num)
     return init_json, location_ids_num
 
 
@@ -401,14 +396,14 @@ def send_test_again(receive_json):
 """
 
 
-if __name__ == '__main__':
-
-
-    init_json = {"user_id": 1, "practice_id": 1, "subject_id": 2,
-                 "department_id": 1, "grade_ids": 2, "textbook": 13796,
-                 "chapter": 13803, "knowledge_ids": [13811, 13812, 13813, 13814]}
-
-    process_initialization(init_json)
+# if __name__ == '__main__':
+#
+#
+#     init_json = {"user_id": 1, "practice_id": 1, "subject_id": 2,
+#                  "department_id": 1, "grade_ids": 2, "textbook": 13796,
+#                  "chapter": 13803, "knowledge_ids": [13811, 13812, 13813, 13814]}
+#
+#     process_initialization(init_json)
 #     receive_json = {"user_id": 1000001, "practice_id": 1, "result":
 #         [{"location": 1, "test_id": 2057204, "is_true": 0, "difficulty": 0, "time_consuming": 40,
 #           "knowledge_ids": [13811]},

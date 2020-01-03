@@ -1,0 +1,53 @@
+#初始化发送
+策略一
+{"user_id":1, "practice_id":1, "subject_id":2,
+  "department_id":1, "grade_ids":2, "textbook":13796,
+  "chapter":13803, "knowledge_ids":[13811,13812,13813]}
+策略二
+{"user_id":1, "practice_id":1, "subject_id":2,
+  "department_id":1, "grade_ids":2, "textbook":13796,
+  "chapter":13803, "knowledge_ids":[13811,13812,13813,13814]}
+
+
+前台做题返回数据
+策略一/practice
+
+{"user_id": 100, "practice_id": 100, "result":
+    [{"location": 1, "test_id": 2057204, "is_true": 0, "difficulty": 0, "time_consuming": 40,
+      "knowledge_ids": [13811]},
+     {"location": 2, "test_id": 2057202, "is_true": 0, "difficulty": 0, "time_consuming": 2,
+      "knowledge_ids": [13811]},
+     {"location": 3, "test_id": 2057214, "is_true": 1, "difficulty": 0, "time_consuming": 3,
+      "knowledge_ids": [13811]},
+     {"location": 4, "test_id": 2057213, "is_true": 1, "difficulty": 0, "time_consuming": 9,
+      "knowledge_ids": [13811]}]}
+
+
+多次交互
+{"user_id": 100, "practice_id": 100, "result": [{"location": 5, "test_id": 2057204, "is_true": 0, "difficulty": 0, "time_consuming": 40, "knowledge_ids": [13811]}]}
+
+
+策略二/practice
+{"user_id": 1, "practice_id": 1, "result":
+[{"location": 1, "test_id": 2057204, "is_true": 0, "difficulty": 0, "time_consuming": 40, "knowledge_ids": [13811]},
+{"location": 2, "test_id": 2057202, "is_true": 0, "difficulty": 0, "time_consuming": 2, "knowledge_ids": [13811]},
+{"location": 3, "test_id": 2057214, "is_true": 1, "difficulty": 0, "time_consuming": 3, "knowledge_ids": [13812]},
+{"location": 4, "test_id": 2057213, "is_true": 1, "difficulty": 0, "time_consuming": 9, "knowledge_ids": [13812]},
+{"location": 5, "test_id": 2057225, "is_true": 1, "difficulty": 0, "time_consuming": 4, "knowledge_ids": [13813]},
+{"location": 6, "test_id": 2057222, "is_true": 0, "difficulty": 0, "time_consuming": 2, "knowledge_ids": [13813]},
+{"location": 7, "test_id": 2057234, "is_true": 1, "difficulty": 0, "time_consuming": 3, "knowledge_ids": [13814]},
+{"location": 8, "test_id": 2057236, "is_true": 0, "difficulty": 0, "time_consuming": 19, "knowledge_ids": [13814]}]}
+
+
+
+我返回的数据修改
+{"status": 0, "message": "success","result":
+{"user_id":1,"practice_id":1,
+"data":{"1":{"test_id":2057202,"knowledge_ids":"[13811]"},
+"2":{"test_id":2057203,"knowledge_ids":"[13811]"},
+"3":{"test_id":2057215,"knowledge_ids":"[13812]"},
+"4":{"test_id":2057216,"knowledge_ids":"[13812]"},
+"5":{"test_id":2057225,"knowledge_ids":"[13813]"},
+"6":{"test_id":2057222,"knowledge_ids":"[13813]"},
+"7":{"test_id":2057233,"knowledge_ids":"[13814]"},
+"8":{"test_id":2057232,"knowledge_ids":"[13814]"}}}}
